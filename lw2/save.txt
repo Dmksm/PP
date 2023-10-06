@@ -1,0 +1,88 @@
+#include <iostream>
+#include <fstream>
+#include <chrono>
+#include <string>
+#include <windows.h>
+#include "BMP.h"
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+#include "BMPReader.h"
+#include <opencv2/opencv.hpp>
+
+struct InputOutputFiles
+{
+    std::ifstream& input;
+    std::ofstream& output;
+};
+
+DWORD WINAPI ThreadProc(const LPVOID lpParam)
+{
+    ExitThread(0);
+}
+
+int main(int argv, char* argc[])
+{
+    SetConsoleCP(1251);
+    SetConsoleOutputCP(1251);
+
+    cv::Mat blur;
+    cv::Mat image = cv::imread("marbles.bmp");
+   
+    cv::blur(image, blur, cv::Size(5, 5));
+    cv::imshow("Original", image);
+    cv::imshow("Gaussian Blurred", blur);
+    cv::imwrite("gaussian_blur.jpg", blur);
+    cv::waitKey(0);
+    cv::destroyAllWindows();
+    return 1;
+    if (argv != 5)
+    {
+        std::cout << "Error! Given parametes must be <program.exe> <input file name> <output file name>"
+            << " <execution threads number> <cores number>" << std::endl;
+        return 1;
+    }
+    const auto start_time = std::chrono::steady_clock::now();
+    std::string inputFileName = argc[1], outputFileName = argc[2];
+
+
+    std::ifstream inputFile(inputFileName, std::ios::in | std::ios::binary);
+    const std::string FILE_FORMAT = ".bmp";
+    std::ofstream outputFile(outputFileName);
+    unsigned threadsNumber = std::stoul(argc[3]);
+    unsigned coresNumber = std::stoul(argc[4]);
+    if (!(inputFile.is_open() &&
+        inputFileName.find(FILE_FORMAT) != std::string::npos &&
+        outputFileName.find(FILE_FORMAT) != std::string::npos &&
+        threadsNumber >= 1 && threadsNumber <= 16 && coresNumber >= 1 && coresNumber <= 4))
+    {
+        std::cout << "Error! filename must be name for existed " << FILE_FORMAT << " format file!"
+            << " Thread number must be between 1 and 16 and cores number must be between 1 and 4!"  
+            << " Given input and output file names: " << inputFileName << " and "
+            << outputFileName << " . And given threads number and cores number: " << threadsNumber 
+            << " and " << coresNumber << std::endl;
+        return 1;
+    }
+
+    bmp::BMPFileUserDefined<bmp::InfoHeaderFormats::V4InfoHeader> bmp2;
+    bmp2.read_bmp("24bit_373_517_example.bmp");
+    bmp2.create_bmp("copy24bitImageNopadding.bmp", true);
+
+    HANDLE* handles = new HANDLE[threadsNumber];
+    InputOutputFiles inputOutputFiles(inputFile, outputFile);
+    
+    for (int threadNumber = 0; threadNumber < threadsNumber; threadNumber++)
+    {
+        handles[threadNumber] = CreateThread(NULL, 0, &ThreadProc, 
+            (LPVOID)&inputOutputFiles, CREATE_SUSPENDED, NULL);
+        ResumeThread(handles[threadNumber]);
+    }
+
+    WaitForMultipleObjects(threadsNumber, handles, true, INFINITE);
+
+    const auto duration = std::chrono::steady_clock::now() - start_time;
+    std::cout << std::chrono::duration<double>(duration).count() << " seconds" << std::endl;
+
+    return 0;
+}
