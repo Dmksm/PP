@@ -13,12 +13,6 @@
 #include <numbers>       
 #include <bitset>   
 
-struct InputOutputFiles
-{
-    std::ifstream& input;
-    std::ofstream& output;
-};
-
 struct InputOutputImages
 {
     cv::Mat* input;
@@ -34,8 +28,7 @@ DWORD WINAPI ThreadProc(const LPVOID lpParam)
     unsigned threadNumber = (*(InputOutputImages*)lpParam).threadNumber;
     unsigned threadsNumber = (*(InputOutputImages*)lpParam).threadsNumber;
 
-    double radius = 2;
-
+    double radius = 4;
     unsigned width = ((*image).size().width / threadsNumber);
     double maxX = ((*image).size().width - radius), maxY = ((*image).size().height - radius);
     double startX = radius, startY = radius;
@@ -113,7 +106,6 @@ int main(int argv, char* argc[])
     SetConsoleCP(1251);
     SetConsoleOutputCP(1251);
 
-    const auto start_time = std::chrono::steady_clock::now();
     if (argv != 5)
     {
         std::cout << "Error! Given parametes must be <program.exe> <input file name> <output file name>"
@@ -123,10 +115,12 @@ int main(int argv, char* argc[])
 
     std::string inputFileName = argc[1], outputFileName = argc[2];
 
+    const auto start_time = std::chrono::steady_clock::now();
     std::ifstream inputFile(inputFileName, std::ios::in | std::ios::binary);
     std::ofstream outputFile(outputFileName);
     unsigned threadsNumber = std::stoul(argc[3]);
     unsigned coresNumber = std::stoul(argc[4]);
+
     if (!(inputFile.is_open() &&
         threadsNumber >= 1 && threadsNumber <= 16 && coresNumber >= 1 && coresNumber <= 4))
     {
@@ -138,42 +132,33 @@ int main(int argv, char* argc[])
         return 1;
     }
 
+    std::vector<DWORD_PTR> affinity{ 1, 3, 7, 15 };
+    DWORD_PTR processAffinityMask = affinity[coresNumber - 1];
+
+
     cv::Mat image = cv::imread(inputFileName);
     cv::Mat copyImage;
 
-    std::cout << " seconds " << std::endl;
     image.copyTo(copyImage);
 
     HANDLE* handles = new HANDLE[threadsNumber];
+
+    BOOL success = SetProcessAffinityMask(GetCurrentProcess(), (DWORD_PTR) processAffinityMask);
+    int v[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+
+    std::vector< InputOutputImages> args;
     for (int threadNumber = 0; threadNumber < threadsNumber; threadNumber++)
     {
-        cv::waitKey(3);
-        InputOutputImages inputOutputImages(&image, &copyImage, threadNumber, threadsNumber);
-        handles[threadNumber] = CreateThread(NULL, 0, &ThreadProc,
-            (LPVOID)&inputOutputImages, CREATE_SUSPENDED, NULL);
-        std::string coreMask = "000000000001";
-        if (coresNumber == 2)
-        {
-            coreMask = "000000000011";
-        }
-        if (coresNumber == 3)
-        {
-            coreMask = "000000000111";
-        }
-        if (coresNumber == 4)
-        {
-            coreMask = "000000001111";
-        }
-
-        std::bitset<16> mask(coreMask);
-        SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR)&mask);
-        ResumeThread(handles[threadNumber]);
+        args.emplace_back(&image, &copyImage, v[threadNumber], threadsNumber);
     }
 
-    WaitForSingleObject(handles, INFINITE);
+    for (int threadNumber = 0; threadNumber < threadsNumber; threadNumber++)
+    {
+        handles[threadNumber] = CreateThread(NULL, 0, &ThreadProc,
+            (LPVOID)&args[threadNumber], NULL, NULL);
+    }
 
-    unsigned delay = 500;
-    cv::waitKey(delay);
+    WaitForMultipleObjects(threadsNumber, handles, true, INFINITE);
     cv::imwrite(outputFileName, copyImage);
     const auto duration = std::chrono::steady_clock::now() - start_time;
     std::cout << std::chrono::duration<double>(duration).count() << " seconds" << std::endl;
