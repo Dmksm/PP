@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <time.h>
 #include <chrono>
+#include <timeapi.h>
+#include <fstream>
 
 int partition(int a[], int start, int end)
 {
@@ -52,7 +54,7 @@ void quicksort(int a[], int start, int end)
 
 void CreateSortedRandomArray()
 {
-    const int ARRAY_SIZE = 10;
+    const int ARRAY_SIZE = 500;
     int arr[ARRAY_SIZE];
     srand(time(NULL));
     for (int i = 0; i < ARRAY_SIZE; i++)
@@ -67,16 +69,30 @@ void CreateSortedRandomArray()
 struct Args
 {
     int number;
+    int operationCount;
+    std::string outFileName;
+    std::chrono::steady_clock::time_point startTime;
 };
 
 DWORD WINAPI ThreadProc(const LPVOID lpParam)
 {
     const int threadNumber = ((Args*)lpParam)->number;
-    printf("Поток №%d выполняет свою работу\n", threadNumber);
-    const auto start_time = std::chrono::steady_clock::now();
-    CreateSortedRandomArray();
-    const auto duration = std::chrono::steady_clock::now() - start_time;
-    std::cout << std::chrono::duration<double>(duration).count() << " seconds" << std::endl;
+    int operationCount = ((Args*)lpParam)->operationCount;
+    std::ofstream outFile(((Args*)lpParam)->outFileName);
+
+    outFile << "Поток № " << threadNumber << std::endl;
+
+    const auto startTime = ((Args*)lpParam)->startTime;
+    while (operationCount)
+    {
+        CreateSortedRandomArray();
+        const auto duration = std::chrono::steady_clock::now() - startTime;
+        
+        outFile << std::chrono::duration<double>(duration).count() * 1000 << std::endl;
+
+        --operationCount;
+    }
+   
     ExitThread(0);
 }
 
@@ -84,13 +100,26 @@ int main(int argv, char* argc[])
 {
     SetConsoleCP(1251);
     SetConsoleOutputCP(1251);
-    int n = std::stoi(argc[1]);
+
+    if (argv != 4)
+    {
+        return 1;
+    }
+    
+    int operationCount = std::stoi(argc[1]);
     HANDLE* handles = new HANDLE[2];
     Args args[2];
+
+    system("pause");
+    
+    const auto startTime = std::chrono::steady_clock::now();
     for (int i = 0; i < 2; i++)
     {
         Args in;
         in.number = i + 1;
+        in.operationCount = operationCount;
+        in.outFileName = argc[i + 2];
+        in.startTime = startTime;
         args[i] = in;
     }
 
@@ -99,6 +128,6 @@ int main(int argv, char* argc[])
         handles[i] = CreateThread(NULL, 0, &ThreadProc, (LPVOID)&(args[i]), NULL, NULL);
     }
 
-    WaitForMultipleObjects(n, handles, true, INFINITE);
+    WaitForMultipleObjects(2, handles, true, INFINITE);
     return 0;
 }
