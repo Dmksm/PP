@@ -213,10 +213,10 @@ void RunWithMutex()
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	//std::cout << "-------------CriticalSection-------------" << std::endl;
-	//RunWithCriticalSection();
-	std::cout << "-------------With mutex-------------" << std::endl;
-	RunWithMutex();
+	std::cout << "-------------CriticalSection-------------" << std::endl;
+	RunWithCriticalSection();
+	/*std::cout << "-------------With mutex-------------" << std::endl;
+	RunWithMutex();*/
 
 	return 0;
 }
