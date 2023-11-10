@@ -7,22 +7,18 @@
 CRITICAL_SECTION FileLockingCriticalSection;
 
 int ReadFromFile() {
-	EnterCriticalSection(&FileLockingCriticalSection);
 	std::fstream myfile("balance.txt", std::ios_base::in);
 	int result;
 	myfile >> result;
 	myfile.close();
-	LeaveCriticalSection(&FileLockingCriticalSection);
 
 	return result;
 }
 
 void WriteToFile(int data) {
-	EnterCriticalSection(&FileLockingCriticalSection);
 	std::fstream myfile("balance.txt", std::ios_base::out);
 	myfile << data << std::endl;
 	myfile.close();
-	LeaveCriticalSection(&FileLockingCriticalSection);
 }
 
 int GetBalance() {
@@ -53,13 +49,17 @@ void Withdraw(int money) {
 
 DWORD WINAPI DoDeposit(CONST LPVOID lpParameter)
 {
+	EnterCriticalSection(&FileLockingCriticalSection);
 	Deposit((int)lpParameter);
+	LeaveCriticalSection(&FileLockingCriticalSection);
 	ExitThread(0);
 }
 
 DWORD WINAPI DoWithdraw(CONST LPVOID lpParameter)
 {
+	EnterCriticalSection(&FileLockingCriticalSection);
 	Withdraw((int)lpParameter);
+	LeaveCriticalSection(&FileLockingCriticalSection);
 	ExitThread(0);
 }
 
