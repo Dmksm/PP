@@ -187,10 +187,10 @@ void RunWithCriticalSection()
 
 void InitializeMutex(HANDLE& mutex)
 {
-	mutex = CreateMutex(
+	mutex = CreateMutexW(
 		NULL,              // default security attributes
 		FALSE,             // initially not owned
-		NULL);             // unnamed mutex
+		TEXT("MyMutex"));             // unnamed mutex
 }
 
 void RunWithMutex()
