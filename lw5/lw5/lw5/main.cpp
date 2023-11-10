@@ -185,27 +185,30 @@ void RunWithCriticalSection()
 	DeleteCriticalSection(&FileLockingCriticalSection);
 }
 
-void RunWithMutex()
+void InitializeMutex(HANDLE& mutex)
 {
-	ClearFile();
-	HANDLE* handlesForMutex = new HANDLE[50];
-
-	ghMutex = CreateMutex(
+	mutex = CreateMutex(
 		NULL,              // default security attributes
 		FALSE,             // initially not owned
 		NULL);             // unnamed mutex
+}
 
+void RunWithMutex()
+{
+	HANDLE* handles = new HANDLE[50];
+
+	InitializeMutex(ghMutex);
 	WriteToFile(0);
 
 	SetProcessAffinityMask(GetCurrentProcess(), 1);
-	StartDepositAndWithdrawWithMutex(handlesForMutex);
+	StartDepositAndWithdrawWithMutex(handles);
 
 	// ожидание окончания работы 50 потоков
-	WaitForMultipleObjects(50, handlesForMutex, true, INFINITE);
-	CloseHandle(ghMutex);
+	WaitForMultipleObjects(50, handles, true, INFINITE);
 	printf("Final Balance: %d\n", GetBalance());
 
 	getchar();
+	CloseHandle(ghMutex);
 }
 
 int _tmain(int argc, _TCHAR* argv[])
